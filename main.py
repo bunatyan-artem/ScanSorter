@@ -2,25 +2,33 @@
 import os
 from openpyxl import Workbook
 
+for filename in os.listdir(os.path.join("results")):
+    file_path = os.path.join("results", filename)
+    os.unlink(file_path)
+
 def splitLine(line: str):
     if len(line) < 20 or line[0] != "0" or line[1] != "1":
         return -1, -1
-    key = ""
+    GTIN = ""
     for i in range(2, len(line) - 1):
         if line[i] == '2' and line[i + 1] == '1':
-            val = line[i + 2 : len(line) - 6]
-            return key, val
-        key += line[i]
+            return GTIN, line[i + 2 : len(line) - 6]
+        GTIN += line[i]
     return -1, -1
 
 
-file = open("kv.txt", "r")
+file = open("pc.txt", "r")
 text = file.read()
 
-kv = {}
+cp = {}
+pc = {}
 for line in text.splitlines():
-    key, value = line.split(" ")
-    kv[key] = value
+    product = line.split(" ")[0]
+    GTINs = line.split(" ")[1:]
+    
+    for GTIN in GTINs:
+        cp[GTIN] = product
+    pc[product] = GTINs
 
 file.close()
 file = open("input.txt", "r")
@@ -29,34 +37,41 @@ text = file.read()
 data = {}
 trash = []
 for line in text.splitlines():
-    key, val = splitLine(line)
-    if key != -1:
-        data.setdefault(key, set()).add(val)
+    GTIN, code = splitLine(line)
+    if GTIN != -1:
+        data.setdefault(GTIN, set()).add(code)
     else:
         trash.append(line)
 
-def fillExcel(codes, key: str):
-    filepath = os.path.join("results", kv[key] + ".xlsx")
+def fillExcel(product: str):
+    filepath = os.path.join("results", product + ".xlsx")
     wb = Workbook()
     ws = wb.active
     ws.title = "Sheet1"
 
-    for code in codes:
-        costil = ["01" + key + "21" + code]
-        ws.append(costil)
+    isEmpty = True
+    for GTIN in pc[product]:
+        if GTIN not in data:
+            continue
+        isEmpty = False
+        for code in data[GTIN]:
+            ws.append(["01" + GTIN + "21" + code])
 
     wb.save(filepath)
+    if isEmpty:
+        file_path = os.path.join("results", product + ".xlsx")
+        os.unlink(file_path)
 
-for key, codes in data.items():
-    fillExcel(codes, key)
+for product, _ in pc.items():
+    fillExcel(product)
 
-filepath = os.path.join("results", "trash.xlsx")
-wb = Workbook()
-ws = wb.active
-ws.title = "Sheet1"
+if trash:
+    filepath = os.path.join("results", "trash.xlsx")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
 
-for s in trash:
-    costil = [s]
-    ws.append(costil)
+    for s in trash:
+        ws.append([s])
 
-wb.save(filepath)
+    wb.save(filepath)
